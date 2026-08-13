@@ -102,11 +102,45 @@ and bandwidth notes in [`docs/fly-deploy.md`](docs/fly-deploy.md).
 
 ## Develop
 
+### Without AWS
+
+`dev/fake-s3.mjs` is a small S3-compatible server that serves synthetic MP3s
+built in memory — real ID3v2.3 tags and valid MPEG frames, so indexing, tag
+parsing and browser playback all behave as they do against real S3. No account,
+no credentials, no bucket.
+
 ```bash
 npm install
-cp .env.example .env    # then edit it
+npm run fake-s3      # terminal 1
+npm run dev:offline  # terminal 2
+```
+
+Open <http://localhost:8080> and log in with `dev`. Three albums, one track
+deliberately missing cover art and one file with no tags at all, so the fallback
+paths are visible.
+
+To run the *container* against it, point it at the host:
+
+```bash
+docker build -t s3-jukebox .
+docker run --rm -p 8080:8080 \
+  -e APP_PASSWORD=dev \
+  -e S3_BUCKET=lewinfox-music -e S3_PREFIX=library/ \
+  -e S3_ENDPOINT=http://host.docker.internal:9099 -e S3_FORCE_PATH_STYLE=true \
+  -e AWS_REGION=ap-southeast-2 -e AWS_ACCESS_KEY_ID=dev -e AWS_SECRET_ACCESS_KEY=dev \
+  --add-host=host.docker.internal:host-gateway \
+  s3-jukebox
+```
+
+### Against the real bucket
+
+```bash
+cp .env.example .env    # then fill in APP_PASSWORD and AWS credentials
 DB_PATH=./data/jukebox.db npm run dev
 ```
+
+Read-only, so there's nothing it can damage — but it does pull tag data for every
+track on first run.
 
 `npm run typecheck` for types, `npm run build` to compile.
 

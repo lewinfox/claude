@@ -8,4 +8,5 @@ data
 .git
 fly.toml
 docs
+dev
 README.md
