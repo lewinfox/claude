@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jukebox</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>"
+    />
+  </head>
+  <body>
+    <div id="login" class="login" hidden>
+      <form id="login-form" class="login-card">
+        <h1>Jukebox</h1>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required />
+        <button type="submit">Unlock</button>
+        <p id="login-error" class="error" hidden></p>
+      </form>
+    </div>
+
+    <div id="app" hidden>
+      <header class="topbar">
+        <h1>Jukebox</h1>
+        <input
+          id="search"
+          type="search"
+          placeholder="Search artist, album or title…"
+          autocomplete="off"
+        />
+        <select id="sort" title="Sort order">
+          <option value="relevance">Relevance</option>
+          <option value="artist">Artist</option>
+          <option value="title">Title</option>
+          <option value="album">Album</option>
+          <option value="recent">Recently added</option>
+          <option value="duration">Longest</option>
+        </select>
+        <button id="reindex" class="ghost" title="Re-scan the bucket">Re-index</button>
+        <button id="logout" class="ghost">Log out</button>
+      </header>
+
+      <div class="toolbar">
+        <span id="summary" class="muted"></span>
+        <div class="spacer"></div>
+        <label class="checkbox">
+          <input id="select-page" type="checkbox" />
+          Select page
+        </label>
+        <button id="clear-selection" class="ghost" hidden>Clear</button>
+        <button id="zip-selected" disabled>Download selected</button>
+        <button id="zip-all" class="ghost">Download all results</button>
+      </div>
+
+      <main>
+        <table id="tracks">
+          <thead>
+            <tr>
+              <th class="col-check"></th>
+              <th class="col-title">Title</th>
+              <th class="col-artist">Artist</th>
+              <th class="col-album">Album</th>
+              <th class="col-time">Time</th>
+              <th class="col-actions"></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <p id="empty" class="empty muted" hidden>Nothing here.</p>
+        <div class="pager">
+          <button id="prev" class="ghost" disabled>Previous</button>
+          <span id="page-label" class="muted"></span>
+          <button id="next" class="ghost" disabled>Next</button>
+        </div>
+      </main>
+
+      <footer class="player" id="player" hidden>
+        <img id="now-cover" alt="" width="48" height="48" />
+        <div class="now">
+          <div id="now-title" class="now-title"></div>
+          <div id="now-artist" class="muted"></div>
+        </div>
+        <audio id="audio" controls preload="none"></audio>
+        <button id="prev-track" class="ghost" title="Previous track">◀</button>
+        <button id="next-track" class="ghost" title="Next track">▶</button>
+      </footer>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
