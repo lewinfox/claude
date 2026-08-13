@@ -26,6 +26,23 @@ the exact IAM policy you need — it is two statements and nothing else.
 
 Then open <http://localhost:8080> and log in with `APP_PASSWORD`.
 
+## Deploy to Fly.io
+
+`fly.toml` is set up for a single machine with a volume mounted at `/data` for
+the SQLite index:
+
+```bash
+fly launch --no-deploy --name my-jukebox --region lhr
+fly volumes create jukebox_data --region lhr --size 1
+fly secrets set APP_PASSWORD=... SESSION_SECRET=... \
+  S3_BUCKET=... AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+fly deploy
+```
+
+**Run exactly one machine.** A Fly volume attaches to a single machine, so
+scaling up gives the second one its own empty index. Full walkthrough, sizing
+and bandwidth notes in [`docs/fly-deploy.md`](docs/fly-deploy.md).
+
 ## Develop
 
 ```bash

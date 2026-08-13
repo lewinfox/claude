@@ -6,3 +6,6 @@ dist
 *.db-wal
 data
 .git
+fly.toml
+docs
+README.md
