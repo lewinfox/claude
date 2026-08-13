@@ -1,0 +1,50 @@
+# Rename the app and set primary_region to match your bucket's region before
+# deploying. See docs/fly-deploy.md for the full walkthrough.
+app = 's3-jukebox'
+primary_region = 'syd'
+
+[build]
+
+[env]
+  PORT = '8080'
+  # Must sit inside the mount below, or the index is lost on every restart.
+  DB_PATH = '/data/jukebox.db'
+  # Fly terminates TLS and forces HTTPS, so the session cookie can be Secure.
+  COOKIE_SECURE = 'true'
+  # s3://lewinfox-music/library/ — neither value is a secret.
+  S3_BUCKET = 'lewinfox-music'
+  S3_PREFIX = 'library/'
+  # Set this to the bucket's real region.
+  AWS_REGION = 'ap-southeast-2'
+  SYNC_INTERVAL_MINUTES = '60'
+
+# Secrets (never put these here) — set with:
+#   fly secrets set APP_PASSWORD=... SESSION_SECRET=... \
+#     AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'suspend'
+  auto_start_machines = true
+  # A volume belongs to exactly one machine, so this app must never run more
+  # than one. Scaling up gives each machine its own divergent SQLite index.
+  min_machines_running = 0
+  max_machines_running = 1
+  processes = ['app']
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '15s'
+    method = 'GET'
+    path = '/api/me'
+
+[mounts]
+  source = 'jukebox_data'
+  destination = '/data'
+  initial_size = '1gb'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
