@@ -102,7 +102,21 @@ and bandwidth notes in [`docs/fly-deploy.md`](docs/fly-deploy.md).
 
 ## Develop
 
-### Without AWS
+Needs Node 22 or newer (the dev server relies on `--env-file-if-exists`), and
+Docker only if you want to exercise the container itself.
+
+```bash
+npm install
+```
+
+There are three ways to run it, in increasing order of realism.
+
+### 1. Without AWS
+
+`dev/fake-s3.mjs` is a small S3-compatible server that serves synthetic MP3s
+built in memory — real ID3v2.3 tags and valid MPEG frames, so indexing, tag
+parsing and browser playback all behave as they do against real S3. No account,
+no credentials, no bucket.
 
 `dev/fake-s3.mjs` is a small S3-compatible server that serves synthetic MP3s
 built in memory — real ID3v2.3 tags and valid MPEG frames, so indexing, tag
@@ -110,19 +124,72 @@ parsing and browser playback all behave as they do against real S3. No account,
 no credentials, no bucket.
 
 ```bash
-npm install
 npm run fake-s3      # terminal 1
 npm run dev:offline  # terminal 2
 ```
 
 Open <http://localhost:8080> and log in with `dev`. Three albums, one track
 deliberately missing cover art and one file with no tags at all, so the fallback
-paths are visible.
+paths are visible rather than theoretical. Source changes reload automatically;
+the fake bucket does not, so restart it if you edit the fixture.
 
-To run the *container* against it, point it at the host:
+### 2. Against the real bucket
+
+```bash
+cp .env.example .env    # then set APP_PASSWORD and pick a credential source
+npm run dev
+```
+
+`npm run dev` reads `.env` itself and keeps the index in `./data/jukebox.db`, so
+nothing needs setting on the command line. Anything already exported in your
+shell still wins over the file.
+
+For credentials, **prefer an existing AWS CLI profile** — put `AWS_PROFILE` in
+`.env` and no keys end up in a file at all. Explicit
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` work too; that's what the deployed
+container uses. Either way they need only the read-only policy above.
+
+Access is read-only, so nothing local development does can damage the bucket. The
+first run fetches tag data for every track — a 256KB ranged read each, a few
+minutes and a few cents for a library this size. The index then persists in
+`./data`, and later runs only look at what changed. Delete `./data` to force a
+full rebuild.
+
+### 3. The container, against the real bucket
+
+Closest to production, and the only way to catch problems in the image itself.
+Rather than copying keys into the environment, mount your AWS config read-only:
 
 ```bash
 docker build -t s3-jukebox .
+
+docker run --rm -p 8080:8080 \
+  -v jukebox-dev-data:/data \
+  -v ~/.aws:/aws:ro \
+  -e AWS_SHARED_CREDENTIALS_FILE=/aws/credentials \
+  -e AWS_CONFIG_FILE=/aws/config \
+  -e AWS_PROFILE=your-profile \
+  -e AWS_REGION=ap-southeast-2 \
+  -e S3_BUCKET=lewinfox-music -e S3_PREFIX=library/ \
+  -e APP_PASSWORD=dev \
+  s3-jukebox
+```
+
+Pointing `AWS_SHARED_CREDENTIALS_FILE` at the mount rather than relying on
+`~/.aws` inside the container is deliberate: the app runs as the unprivileged
+`node` user, so `$HOME` is `/home/node`, not your host home directory. Naming the
+files explicitly avoids depending on how the entrypoint resolves `HOME`.
+
+**This only works for profiles with static keys.** An SSO profile or one using
+`credential_process` will fail inside the container — SSO needs the cached token
+under `~/.aws/sso/cache` refreshed by the `aws` CLI, and `credential_process`
+shells out to a binary that isn't in the image. If your profile is either of
+those, run `aws configure export-credentials --profile your-profile --format env`
+on the host and pass the resulting variables with `-e` instead.
+
+To point the container at the *fake* bucket instead, reach back to the host:
+
+```bash
 docker run --rm -p 8080:8080 \
   -e APP_PASSWORD=dev \
   -e S3_BUCKET=lewinfox-music -e S3_PREFIX=library/ \
@@ -132,28 +199,38 @@ docker run --rm -p 8080:8080 \
   s3-jukebox
 ```
 
-### Against the real bucket
+### Testing it
+
+With a server running, `npm run smoke` exercises the paths that are awkward to
+check by eye — the presigned redirect, range requests (so seeking works), zip
+structure, and the auth boundary:
 
 ```bash
-cp .env.example .env    # then set APP_PASSWORD and pick a credential source
-npm run dev
+npm run smoke                                    # offline server, password "dev"
+PASSWORD=your-password npm run smoke             # against the real bucket
+BASE_URL=https://my-jukebox.fly.dev PASSWORD=... npm run smoke
 ```
 
-`npm run dev` loads `.env` itself and keeps the index in `./data/jukebox.db`, so
-nothing needs setting on the command line. Anything already exported in your
-shell still wins over the file.
+It is read-only — it never writes to the bucket or the index — so it is safe to
+point at a deployed instance. It exits non-zero if anything fails.
 
-For credentials, **prefer an existing AWS CLI profile** — set `AWS_PROFILE` in
-`.env` and no keys end up in a file at all. Explicit
-`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` work too; that's what the deployed
-container uses. Either way the credentials only need the read-only policy above.
-
-Access is read-only, so there is nothing local development can damage in the
-bucket. The first run does fetch tag data for every track — a 256KB ranged read
-each, a few minutes and a few cents for a library of this size. That index then
-persists in `./data`, and later runs only look at what changed.
+For the UI itself there is no automated coverage; open the app and click around.
+The offline fixture is built to make the awkward cases visible: a track with no
+cover art, a file with no tags, and albums long enough to page through.
 
 `npm run typecheck` for types, `npm run build` to compile.
+
+### When something doesn't work
+
+| Symptom | Cause |
+| --- | --- |
+| `Missing required environment variable: APP_PASSWORD` | No `.env`, or you're in the wrong directory. |
+| Library stays empty, `AccessDenied` in logs | `s3:ListBucket` missing, or the `s3:prefix` condition doesn't allow `library/`. |
+| Indexes fine, playback 403s | `s3:GetObject` resource ARN is wrong — it needs the `/*` suffix. |
+| `PermanentRedirect`, or every request is slow | `AWS_REGION` doesn't match the bucket. The SDK follows the redirect, at the cost of a round trip each time. |
+| Playback links die after a few minutes | Role/SSO credentials expiring before `PRESIGN_EXPIRY_SECONDS`. Lower it. |
+| Logged out on every restart | `SESSION_SECRET` unset, so a random one is generated at boot. |
+| `SQLITE_CANTOPEN` in the container | The data directory isn't writable — the entrypoint was bypassed, or `DB_PATH` points outside the volume. |
 
 ## How it works
 
@@ -203,6 +280,11 @@ annotated list. The ones you're most likely to touch:
   it behind Tailscale or Cloudflare Access if it faces the internet.
 - **Presigned URLs are bearer tokens.** Anyone with the link can fetch that
   object until it expires.
+- **Sessions are stateless and logout is client-side.** The session cookie is a
+  signed timestamp, so "Log out" tells the browser to discard it but does not
+  revoke it — a cookie captured beforehand keeps working until
+  `SESSION_MAX_AGE_SECONDS` (30 days by default). To kill live sessions, rotate
+  `SESSION_SECRET`. Shorten the max age if that window bothers you.
 - **The SQLite index is disposable.** Lose it and the app rebuilds it from the
   bucket on next start.
 - **Tags are trusted as-is.** Badly tagged files sort and search badly; the app
