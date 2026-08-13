@@ -21,10 +21,52 @@ docker run -d --name jukebox \
 ```
 
 Copy `.env.example` to `.env` first and fill in `APP_PASSWORD`, `S3_BUCKET`,
-`AWS_REGION` and credentials. See [`docs/aws-setup.md`](docs/aws-setup.md) for
-the exact IAM policy you need — it is two statements and nothing else.
+`AWS_REGION` and credentials.
 
 Then open <http://localhost:8080> and log in with `APP_PASSWORD`.
+
+## S3 permissions
+
+The app needs read access and nothing else. Attach this policy to the IAM user
+whose access key you give the container, replacing `YOUR-BUCKET`:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListLibrary",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::YOUR-BUCKET"
+    },
+    {
+      "Sid": "ReadTracks",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::YOUR-BUCKET/*"
+    }
+  ]
+}
+```
+
+The two actions take **different resource ARNs** — `ListBucket` acts on the
+bucket, `GetObject` on the objects inside it. Using the same ARN for both is the
+usual cause of "it indexes nothing" or "it indexes fine but playback 403s".
+
+To scope it to part of the bucket, narrow `ReadTracks` to
+`arn:aws:s3:::YOUR-BUCKET/music/*`, add a `"Condition": {"StringLike":
+{"s3:prefix": ["music/*"]}}` to `ListLibrary`, and set `S3_PREFIX=music/`.
+
+**Leave Block Public Access fully on.** No public bucket policy, no static
+website hosting and no CORS rule are needed — playback and downloads are
+navigations to presigned URLs, not `fetch` calls, so the browser never runs a
+CORS check.
+
+[`docs/aws-setup.md`](docs/aws-setup.md) has the rest: credential choice for
+running on vs. off AWS, how presigned URL lifetime differs between IAM user keys
+and role credentials, indexing costs, and the CORS rule you would need if the UI
+ever grows waveforms.
 
 ## Deploy to Fly.io
 
