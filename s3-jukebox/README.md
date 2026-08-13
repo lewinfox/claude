@@ -135,12 +135,23 @@ docker run --rm -p 8080:8080 \
 ### Against the real bucket
 
 ```bash
-cp .env.example .env    # then fill in APP_PASSWORD and AWS credentials
-DB_PATH=./data/jukebox.db npm run dev
+cp .env.example .env    # then set APP_PASSWORD and pick a credential source
+npm run dev
 ```
 
-Read-only, so there's nothing it can damage — but it does pull tag data for every
-track on first run.
+`npm run dev` loads `.env` itself and keeps the index in `./data/jukebox.db`, so
+nothing needs setting on the command line. Anything already exported in your
+shell still wins over the file.
+
+For credentials, **prefer an existing AWS CLI profile** — set `AWS_PROFILE` in
+`.env` and no keys end up in a file at all. Explicit
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` work too; that's what the deployed
+container uses. Either way the credentials only need the read-only policy above.
+
+Access is read-only, so there is nothing local development can damage in the
+bucket. The first run does fetch tag data for every track — a 256KB ranged read
+each, a few minutes and a few cents for a library of this size. That index then
+persists in `./data`, and later runs only look at what changed.
 
 `npm run typecheck` for types, `npm run build` to compile.
 
