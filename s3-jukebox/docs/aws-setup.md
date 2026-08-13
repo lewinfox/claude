@@ -6,7 +6,8 @@ mints short-lived presigned URLs for playback and downloads.
 
 ## 1. The IAM policy
 
-Create a customer-managed policy. Replace `YOUR-BUCKET` throughout.
+Create a customer-managed policy. This is scoped to the library at
+`s3://lewinfox-music/library/`:
 
 ```json
 {
@@ -16,46 +17,55 @@ Create a customer-managed policy. Replace `YOUR-BUCKET` throughout.
       "Sid": "ListLibrary",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET"
-    },
-    {
-      "Sid": "ReadTracks",
-      "Effect": "Allow",
-      "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET/*"
-    }
-  ]
-}
-```
-
-The two actions take **different resource ARNs** — `ListBucket` acts on the
-bucket itself, `GetObject` on the objects inside it. Putting both on the same
-ARN is the usual cause of "it can download but the index is empty" (or vice
-versa).
-
-### Restricting to a prefix
-
-If the bucket holds more than music, scope both statements to a prefix and set
-`S3_PREFIX=music/` in the app's environment:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "ListLibrary",
-      "Effect": "Allow",
-      "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET",
+      "Resource": "arn:aws:s3:::lewinfox-music",
       "Condition": {
-        "StringLike": { "s3:prefix": ["music/*"] }
+        "StringLike": {
+          "s3:prefix": ["library/", "library/*"]
+        }
       }
     },
     {
       "Sid": "ReadTracks",
       "Effect": "Allow",
       "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET/music/*"
+      "Resource": "arn:aws:s3:::lewinfox-music/library/*"
+    }
+  ]
+}
+```
+
+Set `S3_BUCKET=lewinfox-music` and `S3_PREFIX=library/` to match.
+
+The two actions take **different resource ARNs** — `ListBucket` acts on the
+bucket itself, `GetObject` on the objects inside it. Putting both on the same
+ARN is the usual cause of "it can download but the index is empty" (or vice
+versa).
+
+The `s3:prefix` condition allows both `library/` and `library/*` deliberately.
+The app pages through `ListObjectsV2` with `Prefix=library/` exactly, and a
+condition listing only `library/*` can reject that call — which surfaces as an
+empty library and an `AccessDenied` in the logs, not as a policy error.
+
+### Widening it to the whole bucket
+
+Drop the `Condition`, use `arn:aws:s3:::lewinfox-music/*` for `ReadTracks`, and
+leave `S3_PREFIX` blank:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListLibrary",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::lewinfox-music"
+    },
+    {
+      "Sid": "ReadTracks",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::lewinfox-music/*"
     }
   ]
 }

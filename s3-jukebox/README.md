@@ -27,8 +27,9 @@ Then open <http://localhost:8080> and log in with `APP_PASSWORD`.
 
 ## S3 permissions
 
-The app needs read access and nothing else. Attach this policy to the IAM user
-whose access key you give the container, replacing `YOUR-BUCKET`:
+The app needs read access and nothing else. This policy is scoped to
+`s3://lewinfox-music/library/` — attach it to the IAM user whose access key you
+give the container:
 
 ```json
 {
@@ -38,25 +39,36 @@ whose access key you give the container, replacing `YOUR-BUCKET`:
       "Sid": "ListLibrary",
       "Effect": "Allow",
       "Action": "s3:ListBucket",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET"
+      "Resource": "arn:aws:s3:::lewinfox-music",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": ["library/", "library/*"]
+        }
+      }
     },
     {
       "Sid": "ReadTracks",
       "Effect": "Allow",
       "Action": "s3:GetObject",
-      "Resource": "arn:aws:s3:::YOUR-BUCKET/*"
+      "Resource": "arn:aws:s3:::lewinfox-music/library/*"
     }
   ]
 }
 ```
 
-The two actions take **different resource ARNs** — `ListBucket` acts on the
-bucket, `GetObject` on the objects inside it. Using the same ARN for both is the
-usual cause of "it indexes nothing" or "it indexes fine but playback 403s".
+Matching config: `S3_BUCKET=lewinfox-music` and `S3_PREFIX=library/`.
 
-To scope it to part of the bucket, narrow `ReadTracks` to
-`arn:aws:s3:::YOUR-BUCKET/music/*`, add a `"Condition": {"StringLike":
-{"s3:prefix": ["music/*"]}}` to `ListLibrary`, and set `S3_PREFIX=music/`.
+Two things to watch:
+
+- The actions take **different resource ARNs** — `ListBucket` acts on the bucket,
+  `GetObject` on the objects inside it. Using the same ARN for both is the usual
+  cause of "it indexes nothing" or "it indexes fine but playback 403s".
+- The `s3:prefix` condition lists **both** `library/` and `library/*`. The app
+  lists with `Prefix=library/` exactly, which the bare `library/*` pattern would
+  reject on some paths — leaving you with an empty library and a 403 in the logs.
+
+Drop the `Condition` and use `arn:aws:s3:::lewinfox-music/*` if you'd rather the
+app see the whole bucket, and clear `S3_PREFIX`.
 
 **Leave Block Public Access fully on.** No public bucket policy, no static
 website hosting and no CORS rule are needed — playback and downloads are
@@ -77,9 +89,12 @@ the SQLite index:
 fly launch --no-deploy --name my-jukebox --region lhr
 fly volumes create jukebox_data --region lhr --size 1
 fly secrets set APP_PASSWORD=... SESSION_SECRET=... \
-  S3_BUCKET=... AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+  AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 fly deploy
 ```
+
+The bucket and prefix are already in `fly.toml` under `[env]`; only the password
+and AWS keys are secrets.
 
 **Run exactly one machine.** A Fly volume attaches to a single machine, so
 scaling up gives the second one its own empty index. Full walkthrough, sizing

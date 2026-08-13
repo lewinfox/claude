@@ -38,10 +38,12 @@ Never put these in `fly.toml` — it is committed to the repo.
 fly secrets set \
   APP_PASSWORD="$(openssl rand -base64 18)" \
   SESSION_SECRET="$(openssl rand -hex 32)" \
-  S3_BUCKET=my-music-bucket \
   AWS_ACCESS_KEY_ID=AKIA... \
   AWS_SECRET_ACCESS_KEY=...
 ```
+
+`S3_BUCKET` and `S3_PREFIX` are already in `fly.toml` under `[env]` — neither is
+a secret, so they don't belong here.
 
 Print the password somewhere you'll see it before you lose it — Fly will not show
 it back to you.

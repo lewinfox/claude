@@ -11,13 +11,16 @@ primary_region = 'lhr'
   DB_PATH = '/data/jukebox.db'
   # Fly terminates TLS and forces HTTPS, so the session cookie can be Secure.
   COOKIE_SECURE = 'true'
+  # s3://lewinfox-music/library/ — neither value is a secret.
+  S3_BUCKET = 'lewinfox-music'
+  S3_PREFIX = 'library/'
+  # Set this to the bucket's real region.
   AWS_REGION = 'eu-west-2'
-  S3_PREFIX = ''
   SYNC_INTERVAL_MINUTES = '60'
 
 # Secrets (never put these here) — set with:
 #   fly secrets set APP_PASSWORD=... SESSION_SECRET=... \
-#     AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... S3_BUCKET=...
+#     AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 
 [http_service]
   internal_port = 8080

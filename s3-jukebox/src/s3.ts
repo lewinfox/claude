@@ -12,6 +12,9 @@ export const s3 = new S3Client({
   region: config.region,
   ...(config.endpoint ? { endpoint: config.endpoint } : {}),
   forcePathStyle: config.forcePathStyle,
+  // A wrong AWS_REGION otherwise fails with an opaque PermanentRedirect; this
+  // retries against the region S3 reports instead.
+  followRegionRedirects: true,
 });
 
 export interface ListedObject {
