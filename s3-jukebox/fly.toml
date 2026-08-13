@@ -1,7 +1,7 @@
 # Rename the app and set primary_region to match your bucket's region before
 # deploying. See docs/fly-deploy.md for the full walkthrough.
 app = 's3-jukebox'
-primary_region = 'lhr'
+primary_region = 'syd'
 
 [build]
 
@@ -15,7 +15,7 @@ primary_region = 'lhr'
   S3_BUCKET = 'lewinfox-music'
   S3_PREFIX = 'library/'
   # Set this to the bucket's real region.
-  AWS_REGION = 'eu-west-2'
+  AWS_REGION = 'ap-southeast-2'
   SYNC_INTERVAL_MINUTES = '60'
 
 # Secrets (never put these here) — set with:

@@ -80,7 +80,7 @@ to the container:
 ```
 AWS_ACCESS_KEY_ID=AKIA...
 AWS_SECRET_ACCESS_KEY=...
-AWS_REGION=eu-west-2
+AWS_REGION=ap-southeast-2
 ```
 
 **Running on AWS** (ECS, EC2, EKS, App Runner) — attach the policy to the task

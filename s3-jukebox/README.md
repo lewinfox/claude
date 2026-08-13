@@ -86,8 +86,8 @@ ever grows waveforms.
 the SQLite index:
 
 ```bash
-fly launch --no-deploy --name my-jukebox --region lhr
-fly volumes create jukebox_data --region lhr --size 1
+fly launch --no-deploy --name my-jukebox --region syd
+fly volumes create jukebox_data --region syd --size 1
 fly secrets set APP_PASSWORD=... SESSION_SECRET=... \
   AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 fly deploy

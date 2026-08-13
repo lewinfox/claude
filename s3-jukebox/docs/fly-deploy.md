@@ -6,7 +6,7 @@ stateless.
 ## 1. Create the app
 
 ```bash
-fly launch --no-deploy --name my-jukebox --region lhr
+fly launch --no-deploy --name my-jukebox --region syd
 ```
 
 Answer no when it offers to set up Postgres, Redis or a Tigris bucket — none are
@@ -22,7 +22,7 @@ that in latency and transfer cost on every zip.
 The volume must exist before the first deploy, in the same region as the app:
 
 ```bash
-fly volumes create jukebox_data --region lhr --size 1
+fly volumes create jukebox_data --region syd --size 1
 ```
 
 1GB is generous. The metadata for 5,000 tracks is a couple of MB; stored cover
