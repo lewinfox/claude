@@ -66,8 +66,10 @@ whole jump. Steps of 5% or more that hold for at least 8 beats become section
 boundaries. Fills and push/pull are absorbed by a 3-beat median and the minimum section
 length. The UI shows a warning with the time and size of each change (click to jump
 there), shades the sections on the tempo chart, and draws a histogram of per-beat BPM
-coloured by section, so two tempos show up as two humps. Rendering is still one BPM for
-the whole track; per-section targets are the natural next step.
+coloured by section, so two tempos show up as two humps. Rendering is deliberately one
+BPM for the whole track: the point of the tool is a file you can beatmatch end to end.
+The warning exists so you know when that choice is stretching a whole section rather
+than tidying drift, and can pick the target BPM with that in mind.
 
 **Grid.** Target beat k lands at `t_first + k · 60/BPM`, so the intro before the first
 beat and the tail after the last are left untouched (ratio 1). Default BPM is the
@@ -140,9 +142,9 @@ tests/                  unit tests + synthetic end-to-end test
 
 ## Known limits / ideas
 
-- Tempo changes are flagged but not yet honoured: rendering uses one BPM for the whole
-  track. Per-section targets (each section to its own steady BPM, hard cut between them)
-  would reuse the same time map.
+- Tracks with a deliberate tempo change are flattened to one BPM by design. If you ever
+  want each section kept at its own steady tempo, the time map already supports it; only
+  the grid builder and a per-section BPM control would change.
 - No manual grid editing yet (nudge a beat, insert/delete one, set the downbeat). The
   data model supports it; it is mostly UI work.
 - Tracks that change time signature or have long free-time sections will get a grid
