@@ -56,6 +56,19 @@ rolling local period: a gap of ~2 periods means a missed beat (the beat *index* 
 dropped, and detections in near-silence (a phantom beat at t=0 is common) are discarded.
 Dropped beats are shown as small red ticks in the UI.
 
+**Deliberate tempo changes** (`segment_tempo`). A drummer drifting and a song that
+changes tempo look the same to a single-BPM grid, but they should not be treated the
+same: flattening a deliberate 120→140 change slows a whole section by 14%. So the
+per-beat tempo curve is scanned for *steps*: at each candidate boundary a line is fitted
+to the 8 beats on either side and the gap between the two lines at the boundary is
+measured. A ramp, however steep, has continuous lines and no gap; a real step shows the
+whole jump. Steps of 5% or more that hold for at least 8 beats become section
+boundaries. Fills and push/pull are absorbed by a 3-beat median and the minimum section
+length. The UI shows a warning with the time and size of each change (click to jump
+there), shades the sections on the tempo chart, and draws a histogram of per-beat BPM
+coloured by section, so two tempos show up as two humps. Rendering is still one BPM for
+the whole track; per-section targets are the natural next step.
+
 **Grid.** Target beat k lands at `t_first + k · 60/BPM`, so the intro before the first
 beat and the tail after the last are left untouched (ratio 1). Default BPM is the
 rounded median of the instantaneous tempo. The UI refuses a target more than 30% from
@@ -127,6 +140,9 @@ tests/                  unit tests + synthetic end-to-end test
 
 ## Known limits / ideas
 
+- Tempo changes are flagged but not yet honoured: rendering uses one BPM for the whole
+  track. Per-section targets (each section to its own steady BPM, hard cut between them)
+  would reuse the same time map.
 - No manual grid editing yet (nudge a beat, insert/delete one, set the downbeat). The
   data model supports it; it is mostly UI work.
 - Tracks that change time signature or have long free-time sections will get a grid

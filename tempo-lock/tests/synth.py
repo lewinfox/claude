@@ -2,11 +2,13 @@
 import numpy as np
 
 
-def live_drums(duration=30.0, sr=44100, base_bpm=120.0, drift_bpm=5.0, seed=0, lead_in=0.5):
+def live_drums(duration=30.0, sr=44100, base_bpm=120.0, drift_bpm=5.0, seed=0, lead_in=0.5, step_at=None, step_bpm=0.0):
+    """step_at/step_bpm add a deliberate tempo change: from step_at seconds on, base tempo is base_bpm + step_bpm."""
     rng = np.random.default_rng(seed)
 
     def tempo_at(t):
-        return base_bpm + drift_bpm * np.sin(2 * np.pi * t / 25) + 0.4 * drift_bpm * np.sin(2 * np.pi * t / 7.3)
+        base = base_bpm + (step_bpm if step_at is not None and t >= step_at else 0.0)
+        return base + drift_bpm * np.sin(2 * np.pi * t / 25) + 0.4 * drift_bpm * np.sin(2 * np.pi * t / 7.3)
 
     beats = [lead_in]
     t = lead_in

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>tempo-lock</title>
+<link rel="icon" href="data:,">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -35,8 +36,17 @@
   <section id="result" hidden>
     <div class="card">
       <div class="stats" id="stats"></div>
-      <div class="panel-title">Tempo over time <span class="hint">detected instantaneous BPM per beat, dashed line is the target</span></div>
-      <canvas id="tempo" class="tempo"></canvas>
+      <div id="warn" class="warn" hidden></div>
+      <div class="charts">
+        <div class="chart-main">
+          <div class="panel-title">Tempo over time <span class="hint">BPM per beat · dashed = target · shaded bands = sections at a steady tempo</span></div>
+          <canvas id="tempo" class="tempo"></canvas>
+        </div>
+        <div class="chart-side">
+          <div class="panel-title">Beat intervals <span class="hint">histogram of BPM per beat</span></div>
+          <canvas id="hist" class="tempo"></canvas>
+        </div>
+      </div>
     </div>
 
     <div class="card">

@@ -314,6 +314,72 @@
     win.style.width = `${clamp((v1 - v0) / t.duration, 0.002, 1) * 100}%`;
   }
 
+  const SECTION_COLORS = ["rgba(90,209,255,.16)", "rgba(125,255,167,.16)", "rgba(255,93,143,.16)", "rgba(255,180,84,.16)", "rgba(200,140,255,.16)"];
+  const SECTION_SOLID = ["#5ad1ff", "#7dffa7", "#ff5d8f", "#ffb454", "#c88cff"];
+
+  function bpmRange(a, target) {
+    let lo = Math.min(a.min_bpm, target), hi = Math.max(a.max_bpm, target);
+    for (const sec of a.sections || []) { lo = Math.min(lo, sec.bpm); hi = Math.max(hi, sec.bpm); }
+    const pad = Math.max(1, (hi - lo) * 0.25);
+    return [lo - pad, hi + pad];
+  }
+
+  function drawHist() {
+    const cv = $("hist");
+    const { g, w, h } = setupCanvas(cv);
+    g.clearRect(0, 0, w, h);
+    const a = state.track && state.track.analysis;
+    if (!a || !a.bpm_curve.length) return;
+    const level = parseFloat($("level").value) || 1;
+    const target = (parseFloat($("bpm").value) || a.suggested_bpm) / level;
+    const vals = a.bpm_curve;
+    // bin width: a "nice" number giving ~30 bins across the observed range
+    let lo = Infinity, hi = -Infinity;
+    for (const v of vals) { if (v < lo) lo = v; if (v > hi) hi = v; }
+    lo = Math.min(lo, target); hi = Math.max(hi, target);
+    const bw = niceStep(Math.max(0.1, (hi - lo) / 30));
+    const b0 = Math.floor(lo / bw) - 1, b1 = Math.ceil(hi / bw) + 1, nb = b1 - b0;
+    const sections = (a.sections && a.sections.length > 1) ? a.sections : [{ start_beat: 0, end_beat: vals.length }];
+    const counts = sections.map(() => new Float64Array(nb));
+    sections.forEach((sec, si) => {
+      for (let i = sec.start_beat; i < Math.min(sec.end_beat, vals.length); i++) counts[si][Math.floor(vals[i] / bw) - b0]++;
+    });
+    const totals = new Float64Array(nb);
+    counts.forEach((c) => { for (let i = 0; i < nb; i++) totals[i] += c[i]; });
+    let peak = 1; for (const t of totals) if (t > peak) peak = t;
+    const padL = 6, padB = 16, padT = sections.length > 1 ? 16 : 6, plotH = h - padB - padT, colW = (w - padL * 2) / nb;
+    const X = (bpm) => padL + (bpm / bw - b0) * colW;
+    // bars, stacked by section
+    for (let i = 0; i < nb; i++) {
+      let y = h - padB;
+      sections.forEach((_, si) => {
+        const c = counts[si][i]; if (!c) return;
+        const bh = c / peak * plotH;
+        g.fillStyle = sections.length > 1 ? SECTION_SOLID[si % SECTION_SOLID.length] : color("--wave-a");
+        g.globalAlpha = 0.85;
+        g.fillRect(padL + i * colW + 0.5, y - bh, Math.max(1, colW - 1), bh);
+        g.globalAlpha = 1;
+        y -= bh;
+      });
+    }
+    // axis labels
+    g.fillStyle = "rgba(255,255,255,.4)"; g.font = "10px system-ui, sans-serif"; g.textAlign = "center";
+    const labStep = niceStep((hi - lo) / 4);
+    for (let b = Math.ceil((b0 * bw) / labStep) * labStep; b <= b1 * bw; b += labStep) {
+      const x = X(b); if (x < padL || x > w - padL) continue;
+      g.fillRect(x, h - padB, 1, 3);
+      g.fillText(b.toFixed(labStep < 1 ? 1 : 0), x, h - 3);
+    }
+    // target
+    g.setLineDash([4, 4]); g.strokeStyle = color("--accent"); g.beginPath(); g.moveTo(X(target), 4); g.lineTo(X(target), h - padB); g.stroke(); g.setLineDash([]);
+    // section medians
+    if (sections.length > 1) sections.forEach((sec, si) => {
+      g.fillStyle = SECTION_SOLID[si % SECTION_SOLID.length]; g.textAlign = "center";
+      g.fillText(sec.bpm.toFixed(1), clamp(X(sec.bpm), 16, w - 16), 10);
+    });
+    g.textAlign = "left";
+  }
+
   function drawTempo() {
     const cv = $("tempo");
     const { g, w, h } = setupCanvas(cv);
@@ -323,9 +389,17 @@
     const level = parseFloat($("level").value) || 1;
     const target = (parseFloat($("bpm").value) || a.suggested_bpm) / level;
     const dur = a.duration;
-    let lo = Math.min(a.min_bpm, target), hi = Math.max(a.max_bpm, target);
-    const pad = Math.max(1, (hi - lo) * 0.25); lo -= pad; hi += pad;
+    const [lo, hi] = bpmRange(a, target);
     const X = (t) => t / dur * w, Y = (b) => h - (b - lo) / (hi - lo) * h;
+    // steady-tempo sections (only interesting when there is more than one)
+    if (a.sections && a.sections.length > 1) {
+      a.sections.forEach((sec, i) => {
+        g.fillStyle = SECTION_COLORS[i % SECTION_COLORS.length];
+        g.fillRect(X(sec.start), 0, X(sec.end) - X(sec.start), h);
+        g.strokeStyle = SECTION_SOLID[i % SECTION_SOLID.length]; g.lineWidth = 1; g.globalAlpha = 0.7;
+        g.beginPath(); g.moveTo(X(sec.start), Y(sec.bpm)); g.lineTo(X(sec.end), Y(sec.bpm)); g.stroke(); g.globalAlpha = 1;
+      });
+    }
     // gridlines
     g.strokeStyle = "rgba(255,255,255,.08)"; g.fillStyle = "rgba(255,255,255,.4)"; g.font = "10px system-ui, sans-serif";
     const step = niceStep((hi - lo) / 4);
@@ -346,6 +420,14 @@
     // target
     g.setLineDash([4, 4]); g.strokeStyle = color("--accent"); g.beginPath(); g.moveTo(0, Y(target)); g.lineTo(w, Y(target)); g.stroke(); g.setLineDash([]);
     g.fillStyle = color("--accent"); g.textAlign = "right"; g.fillText(`${target.toFixed(2)} BPM${level !== 1 ? ` (detected level, ×${level})` : ""}`, w - 4, Y(target) - 3); g.textAlign = "left";
+    // deliberate tempo changes
+    g.font = "13px system-ui, sans-serif"; g.textAlign = "center";
+    for (const c of a.tempo_changes || []) {
+      g.setLineDash([2, 3]); g.strokeStyle = color("--accent"); g.lineWidth = 1.5;
+      g.beginPath(); g.moveTo(X(c.time), 16); g.lineTo(X(c.time), h); g.stroke(); g.setLineDash([]); g.lineWidth = 1;
+      g.fillStyle = color("--accent"); g.fillText("⚠", X(c.time), 13);
+    }
+    g.textAlign = "left";
     // playhead (in A time)
     const pos = toA(position(), state.src);
     g.fillStyle = color("--play"); g.fillRect(X(pos) - 0.5, 0, 1.5, h);
@@ -353,6 +435,7 @@
 
   function draw() {
     drawTempo();
+    drawHist();
     drawWave("a");
     if (state.tracks.b) drawWave("b");
     $("time").textContent = fmtTime(position());
@@ -491,8 +574,32 @@
     return out;
   }
 
+  function renderWarning(a) {
+    const box = $("warn");
+    const changes = a.tempo_changes || [];
+    box.hidden = !changes.length;
+    if (!changes.length) { box.innerHTML = ""; return; }
+    const items = changes.map((c, i) => {
+      const pct = ((c.ratio - 1) * 100).toFixed(0);
+      const what = c.kind === "tempo change" ? `${c.from_bpm.toFixed(1)} → ${c.to_bpm.toFixed(1)} BPM (${pct > 0 ? "+" : ""}${pct}%)` : `${c.kind} feel, ${c.from_bpm.toFixed(1)} → ${c.to_bpm.toFixed(1)} BPM`;
+      return `<div><b>${fmtTime(c.time)}</b> ${what}<a data-seek="${c.time}">jump to</a></div>`;
+    }).join("");
+    const secs = a.sections.map((sec) => `${sec.bpm.toFixed(1)}`).join(" / ");
+    box.innerHTML = `<div class="icon">⚠</div><div>
+      <div><b>${changes.length === 1 ? "A tempo change that looks deliberate" : `${changes.length} tempo changes that look deliberate`}</b>:
+      the tempo steps to a new value and stays there, rather than drifting. Sections: ${secs} BPM.</div>${items}
+      <div class="hint" style="margin:6px 0 0">Straightening to one BPM will speed up or slow down whole sections, not just tidy the drift. Check the histogram: separate humps are separate tempos.</div></div>`;
+    box.querySelectorAll("a[data-seek]").forEach((el) => el.addEventListener("click", () => {
+      const tA = parseFloat(el.dataset.seek);
+      const span = state.view[1] - state.view[0];
+      setView(tA - span * 0.3, tA + span * 0.7);
+      seek(fromA(tA, state.src));
+    }));
+  }
+
   function applyAnalysis(track) {
     const a = track.analysis;
+    const changes = a.tempo_changes || [];
     const t = state.tracks.a || {};
     Object.assign(t, { duration: t.buffer ? t.buffer.duration : a.duration, beats: a.beats, isDown: a.is_downbeat, barOf: barNumbers(a.is_downbeat), peaks: track.peaks, dropped: a.dropped_beats });
     state.tracks.a = t;
@@ -503,8 +610,10 @@
       ["Median tempo", a.median_bpm.toFixed(2), "BPM"],
       ["Tempo range", `${a.min_bpm.toFixed(1)}–${a.max_bpm.toFixed(1)}`, "BPM, 2nd–98th pct"],
       ["Drift", `±${(spread / 2 / a.median_bpm * 100).toFixed(1)}%`, `${spread.toFixed(1)} BPM spread`],
+      ["Tempo changes", changes.length ? `⚠ ${changes.length}` : "none", changes.length ? "look deliberate" : "drift only", changes.length ? "flag" : ""],
       ["Length", fmtTime(a.duration), ""],
-    ].map(([k, v, s]) => `<div class="stat"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`).join("");
+    ].map(([k, v, s, cls]) => `<div class="stat ${cls || ""}"><div class="k">${k}</div><div class="v">${v} <small>${s}</small></div></div>`).join("");
+    renderWarning(a);
     $("bpm").value = a.suggested_bpm.toFixed(2).replace(/\.00$/, "");
     $("render").disabled = false;
   }
@@ -545,14 +654,14 @@
   drop.addEventListener("drop", (e) => { const f = e.dataTransfer.files[0]; if (f) upload(f); });
 
   $("render").addEventListener("click", renderTrack);
-  $("bpm").addEventListener("input", drawTempo);
+  $("bpm").addEventListener("input", () => { drawTempo(); drawHist(); });
   $("level").addEventListener("change", () => {
     const a = state.track && state.track.analysis; if (!a) return;
     $("bpm").value = Math.round(a.median_bpm * parseFloat($("level").value));
-    drawTempo();
+    drawTempo(); drawHist();
   });
-  $("bpm-median").addEventListener("click", () => { $("bpm").value = (state.track.analysis.median_bpm * parseFloat($("level").value)).toFixed(2); drawTempo(); });
-  $("bpm-round").addEventListener("click", () => { $("bpm").value = Math.round(parseFloat($("bpm").value)); drawTempo(); });
+  $("bpm-median").addEventListener("click", () => { $("bpm").value = (state.track.analysis.median_bpm * parseFloat($("level").value)).toFixed(2); drawTempo(); drawHist(); });
+  $("bpm-round").addEventListener("click", () => { $("bpm").value = Math.round(parseFloat($("bpm").value)); drawTempo(); drawHist(); });
   $("play").addEventListener("click", () => { state.playing ? pause() : play(); });
   $("stop").addEventListener("click", () => { pause(); state.pausedAt = 0; draw(); });
   $("src-a").addEventListener("click", () => switchSource("a"));

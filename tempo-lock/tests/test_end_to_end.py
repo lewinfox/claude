@@ -62,3 +62,20 @@ def test_render_produces_regular_grid(track, analysis):
     # the grid we claim to have produced is where the beats really are
     err = np.array([np.abs(again.beats - g).min() for g in grid.target_beats])
     assert np.median(err) < 0.006 and np.percentile(err, 95) < 0.02
+
+
+def test_deliberate_tempo_change_is_flagged():
+    y, sr, truth = live_drums(duration=40.0, drift_bpm=2.0, step_at=20.0, step_bpm=20.0, seed=4)
+    a = analyse(y, sr, backend="auto")
+    assert len(a.tempo_changes) == 1, a.tempo_changes
+    c = a.tempo_changes[0]
+    assert abs(c["time"] - 20.0) < 1.5
+    assert abs(c["from_bpm"] - 120) < 3 and abs(c["to_bpm"] - 140) < 3
+    assert len(a.sections) == 2
+
+
+def test_plain_drift_is_not_flagged():
+    y, sr, _ = live_drums(duration=30.0, drift_bpm=5.0)
+    a = analyse(y, sr, backend="auto")
+    assert a.tempo_changes == []
+    assert len(a.sections) == 1
