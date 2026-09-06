@@ -1,0 +1,12 @@
+# core
+numpy
+scipy
+soundfile>=0.12       # bundles libsndfile with MP3 read/write
+librosa>=0.10
+fastapi
+uvicorn[standard]
+python-multipart
+# beat tracker (Beat This!, CPJKU). torch is heavy: install the CPU build first via setup.sh
+beat_this>=1.1
+# dev
+pytest
