@@ -25,6 +25,26 @@ cd tempo-lock
 python -m tempolock serve       # http://127.0.0.1:8000
 ```
 
+Docker (no Python or system packages needed on the host):
+
+```bash
+cd tempo-lock
+docker compose up --build        # http://127.0.0.1:8000
+# or without compose:
+docker build -t tempo-lock .
+docker run --rm -p 8000:8000 -v tempo-lock-data:/data tempo-lock
+```
+
+The image is CPU-only (`python:3.11-slim` + rubberband-cli + ffmpeg + CPU torch) and bakes
+in the Beat This! checkpoint, so it needs no network at run time. Expect ~2 GB. Uploads
+and rendered files go to the `/data` volume; the job table is in memory, so a container
+restart forgets tracks (the files stay). The CLI works in the container too:
+
+```bash
+docker run --rm --user "$(id -u)" -v "$PWD:/work" tempo-lock \
+  python -m tempolock render /work/track.mp3 -o /work/out.mp3
+```
+
 Command line:
 
 ```bash

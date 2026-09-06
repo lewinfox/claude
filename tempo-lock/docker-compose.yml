@@ -1,0 +1,13 @@
+services:
+  tempo-lock:
+    build: .
+    image: tempo-lock
+    ports:
+      - "8000:8000"
+    volumes:
+      # uploads and rendered files; the job table is in memory so a restart forgets tracks
+      - tempo-lock-data:/data
+    restart: unless-stopped
+
+volumes:
+  tempo-lock-data:
